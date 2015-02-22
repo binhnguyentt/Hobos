@@ -299,6 +299,8 @@ void read_dir(dword_t lba, FILE *fp, char *fat, fat32_bpb* bpb) {
 }
 
 int main(int argc, char *argv[]) {
+	cout << "Sizeof(fat32_bpb): " << sizeof(fat32_bpb) << endl;
+	
     FILE *fp = fopen("/home/nguyenbinh/Desktop/myos/fat32/fat32.img", "rb");
     if (fp) {
         struct fat32_bpb bpb;

@@ -46,6 +46,9 @@ start:
 	mov si, str
 	call prints
 
+	mov cx, 1234
+	call printbn
+
 	jmp $
 
 prints: ; ds:si point to null-terminate string
@@ -68,6 +71,30 @@ printc: ; al store character to print
 printn: ; al store number to print
 	add al, '0'
 	call printc
+	ret
+
+printbn: ; cx store big number to print
+	cmp cx, 10
+	jge .do_math
+
+	mov al, cl
+	call printn
+	jmp .return
+
+	.do_math:
+		mov ax, cx
+		mov dl, 10
+		div dl ; ah: remainder, al: quotient
+		
+		push ax
+		xor cx, cx
+		mov cl, al
+		call printbn
+		pop ax
+		mov al, ah
+		call printn
+		
+	.return:
 	ret
 
 str: db 'This is a string', 0

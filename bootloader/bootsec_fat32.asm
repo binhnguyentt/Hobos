@@ -70,7 +70,7 @@ start:
 	mov si, str
 	call prints
 
-	mov cx, over_bpb - $$
+	mov ecx, 1234567890 ; over_bpb - $$
 	call printbn
 
 	jmp $
@@ -99,10 +99,10 @@ printn:
 	call printc
 	ret
 
-; Print a big number stored in cx
-; Destroy dl, ax registers
+; Print a big number stored in ecx
+; Destroy eax, edx registers
 printbn:
-	cmp cx, 10
+	cmp ecx, 10
 	jge .do_math
 
 	mov al, cl
@@ -110,16 +110,20 @@ printbn:
 	jmp .return
 
 	.do_math:
-		mov ax, cx
-		mov dl, 10
-		div dl ; ah: remainder, al: quotient
+		mov eax, ecx
+		xor edx, edx ; edx:eax storex 32bit number
+
+		mov ecx, 10
+		div ecx 		 ; edx: remainder, eax: quotient
 		
-		push ax
-		xor cx, cx
-		mov cl, al
+		push edx
+
+		; Print the rest
+		mov ecx, eax
 		call printbn
-		pop ax
-		mov al, ah
+
+		; Print the remainder
+		pop eax
 		call printn
 		
 	.return:

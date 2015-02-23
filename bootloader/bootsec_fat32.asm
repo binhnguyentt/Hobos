@@ -105,8 +105,15 @@ start:
 		; At this time, first dir cluster is loaded to 0x0:0x8000
 		mov si, 0x8000
 		
-		.loop:	
+		.loop:
+			; End of list?
+			; TODO: I still not check for end-of-cluster yet
+			; so, if directory length over 1 cluster, this will cause error
 			cmp byte [si], 0
+			je .go_out
+
+			; Is that a deleted entry?
+			cmp byte [si], 0x5e
 			je .go_out
 
 			push si
@@ -120,9 +127,24 @@ start:
 			je .next_entry
 
 			; Here, si point to 8.3 name of entry
-			xor bx, bx
+			mov dx, si
+			mov di, kernel
+			mov cx, 11
+			repe cmpsb
+			jne .not_match
+
+			; Got file Kernel.bin
+			mov si, dx
+			xor bl, bl
 			mov byte [di], bl
 			call prints
+
+			.not_match:
+			mov si, dx 	; Restore si
+
+			; xor bx, bx
+			; mov byte [di], bl
+			; call prints
 
 			.next_entry:
 			pop si
@@ -130,7 +152,7 @@ start:
 			jmp .loop
 
 		.go_out:
-			jmp $
+		jmp $
 
 		; jmp 0x8000
 	.over_err:
@@ -192,6 +214,7 @@ printbn:
 	ret
 
 errmsg:	db 'Cant read sector', 0
+kernel: db 'KERNEL  BIN'
 
 read_packet:
 	db 16		; Sizeof packet

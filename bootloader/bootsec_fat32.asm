@@ -3,8 +3,8 @@
 jmp over_bpb
 nop
 
-db 'mkfs.fat' 		; OEM name
-bpst: dw 512		; Bytes per sector
+db 'mkfs.fat' 	; OEM name
+bpst: dw 512	; Bytes per sector
 stpc: db 8		; Sectors per cluster
 rsts: dw 32		; Reserved sectors <~~
 nbof: db 2		; Number of FAT table
@@ -70,30 +70,28 @@ start:
 	sub eax, 2
 	xor ebx, ebx
 	mov bl, [stpc]	; sectors per cluster
-	mul ebx			; edx:eax stores number of sector to root dir
+	mul ebx			; edx:eax stores number sectors of fats
 
-	pop ebx
+	pop ebx			; Get reserved sectors
 	pop ecx
-	add eax, ebx
-	adc edx, ecx	; edx:eax stores total number of sectors to root dir (from begining
-					; of partition, NOT begining of disk)
+	add eax, ebx	; Total = Reserved sectors + FATs sectors
+	adc edx, ecx	
+	
+	; Here: edx:eax stores total number of sectors to root dir (from begining
+	; of partition, NOT begining of disk)
 
 	; Note: edx:eax stores LBA to root dir
 	; LBA's unit is sector (not byte)
 
 	; Read sectors
-	mov [lba_addr], eax		; LBA-low
-	mov [lba_addr + 4], edx	; LBA-high
-	mov bl, [stpc]			; Num of sectors
+	pop cx			; Drive number
 	xor bh, bh
-	mov [num_sector], bx
+	mov bl, [stpc]	; Read 1 Cluster
+	call read_disk	; Read
 
-	mov si, read_packet
-	mov ah, 0x42
-	pop dx					; Get drive number pushed before
-	int 0x13
+	cmp ah, 1 ; Is error?
+	je short .error
 
-	jc short .error
 	jmp .parse_rootdir
 
 	.error:
@@ -219,9 +217,35 @@ printbn:
 errmsg:	db 'Cant read sector', 0
 kernel: db 'KERNEL  BIN'
 
-read_disk:
+; Read disk with:
+; LBA: stores in edx:eax
+; Drive number: stores in cl
+; Number of sectors to read: stores in bx
 
-read_packet:
+; Return:
+; ah = 0 ~> ok
+; ah = 1 ~> err
+read_disk:
+	mov [lba_addr], eax		; LBA-low
+	mov [lba_addr + 4], edx	; LBA-high
+	mov [num_sector], bx
+
+	mov si, packet
+	mov ah, 0x42
+	mov dl, cl
+	int 0x13
+	
+	jc .carry
+	xor ah, ah
+	jmp short .return
+
+	.carry:	; error
+	mov ah, 1
+
+	.return:
+	ret
+	
+packet:
 	db 16		; Sizeof packet
 	db 0		; Zero
 num_sector:

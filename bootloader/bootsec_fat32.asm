@@ -78,40 +78,34 @@ start:
 	adc edx, ecx	; edx:eax stores total number of sectors to root dir (from begining
 					; of partition, NOT begining of disk)
 
-	mov bx, [bpst]	; bytes per sector
-	mul ebx			; edx:eax stores LBA to root dir (from begining of partition,
-					; NOT from begining of disk)
 
-	; push eax
-	; mov ecx, edx
-	; call printbn
-	; pop ecx
-	; call printbn
+	; Note: edx:eax stores LBA to root dir
+	; LBA's unit is sector (not byte)
 
+	; Read sectors
+	mov [lba_addr], eax		; LBA-low
+	mov [lba_addr + 4], edx	; LBA-high
+	mov bl, [stpc]			; Num of sectors
+	xor bh, bh
+	mov [num_sector], bx
 
-	mov si, drive
-	call prints
+	mov si, read_packet
+	mov ah, 0x42
+	pop dx					; Get drive number pushed before
+	int 0x13
 
-	xor ecx, ecx
-	pop cx
-	xor ch, ch
-	call printbn
+	jc short .error
+	jmp .continue
 
-	; push eax
-	; mov si, lba
-	; call prints
+	.error:
+		mov si, errmsg
+		call prints
+		jmp .over_err
 
-	; pop ecx
-	; call printbn
-
-	; Print somethings
-
-	; mov si, str
-	; call prints
-
-	; mov ecx, over_bpb - $$
-	; call printbn
-
+	.continue:
+		jmp 0x8000
+	.over_err:
+	
 	jmp $
 
 prints: ; ds:si point to null-terminate string
@@ -168,14 +162,29 @@ printbn:
 	.return:
 	ret
 
-str: 	db '. Sizeof bpb is: ', 0
-data: 	db 'Num of sectors to data: ', 0
-root: 	db 'Number of sectors to root dir: ', 0
-lba: 	db 'LBA to root dir: ', 0
-drive:	db 'Drive number: ', 0
+errmsg:	db 'Cant read sector', 0
+
+read_packet:
+	db 16		; Sizeof packet
+	db 0		; Zero
+num_sector:
+	dw 1		; Number of sectors to read (max 127 on some bioses)
+				; int 13h reset this to actual readed sectors
+addr:
+	dw 0x8000	; Offset
+	dw 0x0		; Segment
+lba_addr:
+	dd 1
+	dd 0
 
 	times 510 - ($-$$) db 0
 	db 0x55
 	db 0xaa
-	
-	
+
+; Next sector for test only
+cli
+hlt
+
+dd 1234567890
+
+times 2048 - ($-$$) db 0

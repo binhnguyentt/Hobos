@@ -78,7 +78,6 @@ start:
 	adc edx, ecx	; edx:eax stores total number of sectors to root dir (from begining
 					; of partition, NOT begining of disk)
 
-
 	; Note: edx:eax stores LBA to root dir
 	; LBA's unit is sector (not byte)
 
@@ -95,15 +94,45 @@ start:
 	int 0x13
 
 	jc short .error
-	jmp .continue
+	jmp .parse_rootdir
 
 	.error:
 		mov si, errmsg
 		call prints
 		jmp .over_err
 
-	.continue:
-		jmp 0x8000
+	.parse_rootdir:
+		; At this time, first dir cluster is loaded to 0x0:0x8000
+		mov si, 0x8000
+		
+		.loop:	
+			cmp byte [si], 0
+			je .go_out
+
+			push si
+			mov di, si
+			add di, 11
+
+			; Check for valid entry?
+			cmp byte [di], 0xF	; Fat32 LFN
+			
+			; This is Fat32 LFN, skip for now
+			je .next_entry
+
+			; Here, si point to 8.3 name of entry
+			xor bx, bx
+			mov byte [di], bl
+			call prints
+
+			.next_entry:
+			pop si
+			add si, 32
+			jmp .loop
+
+		.go_out:
+			jmp $
+
+		; jmp 0x8000
 	.over_err:
 	
 	jmp $

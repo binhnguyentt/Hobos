@@ -133,11 +133,21 @@ start:
 			repe cmpsb
 			jne .next_entry
 
-			; Got file Kernel.bin
+			; Got file Kernel.bin (8.3 format)
 			mov si, dx
-			xor bl, bl
-			mov byte [di], bl
-			call prints
+			;xor bl, bl
+			;mov byte [di], bl
+			;call prints
+
+			add si, 26	; cluster low
+			; Now ds:si store cluster of kernel.bin
+			; TODO: need combine with cluster high
+
+			xor ecx, ecx
+			mov cx, [si]
+			call printbn
+
+			jmp $
 
 			.next_entry:
 			pop si
@@ -208,6 +218,8 @@ printbn:
 
 errmsg:	db 'Cant read sector', 0
 kernel: db 'KERNEL  BIN'
+
+read_disk:
 
 read_packet:
 	db 16		; Sizeof packet

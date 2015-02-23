@@ -131,20 +131,13 @@ start:
 			mov di, kernel
 			mov cx, 11
 			repe cmpsb
-			jne .not_match
+			jne .next_entry
 
 			; Got file Kernel.bin
 			mov si, dx
 			xor bl, bl
 			mov byte [di], bl
 			call prints
-
-			.not_match:
-			mov si, dx 	; Restore si
-
-			; xor bx, bx
-			; mov byte [di], bl
-			; call prints
 
 			.next_entry:
 			pop si

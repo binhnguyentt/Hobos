@@ -1,2 +1,2 @@
 #!/bin/bash
-qemu-system-x86_64 bootsec_fat32
+qemu-system-x86_64 fat32.img

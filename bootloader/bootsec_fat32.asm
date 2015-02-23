@@ -3,11 +3,11 @@
 jmp over_bpb
 nop
 
-db 'mkfs.fat' 	; OEM name
-dw 512			; Bytes per sector
+db 'mkfs.fat' 		; OEM name
+bpst: dw 512		; Bytes per sector
 stpc: db 8		; Sectors per cluster
 rsts: dw 32		; Reserved sectors <~~
-db 2			; Number of FAT table
+nbof: db 2		; Number of FAT table
 dw 0			; Number of root directory (N/A for Fat32)
 dw 0			; Number of sectors in partition (if lt 32M - N/A for fat32)
 db 0xF8			; Media descriptor (0xF8 is hard disk)
@@ -18,10 +18,10 @@ dd 0			; Number of hidden sectors
 dd 0			; Number if hidden sectors in partition (if gt 32M)
 
 ; Fat32 bpb
-stpf: dd 0		; Number of sectors per FAT
+stpf: dd 299	; Number of sectors per FAT
 dw 0			; Flags
 dw 0			; Version of fat32
-root_clus: dd 2	; Cluster of root directory
+csrd: dd 2		; Cluster of starting root directory
 dw 1			; Sector number of file system information sector
 dw 6			; Sector number of backup boot sector
 times 12 db	0	; Reserved
@@ -43,35 +43,74 @@ start:
 	mov sp, 0x7c00
 	sti
 
+	push dx			; driver number
+
 	; Read FAT table to memory
 	; TODO
 
 	; Get root dir
-	; mov ax, rsts 	; Reserved sectors
-	; xor dx, dx
-	; cwd			; dx:ax store reserved sectors
+
+	xor ebx, ebx
+	mov bx, [rsts]	; reserved sectors (word)
+	mov eax, [stpf]	; number of sectors per fat (dword)
+	xor edx, edx
+	xor ecx, ecx
+	mov cl, [nbof]
+	mul ecx			; edx:eax stores number of sectors of FAT tables
+
+	add eax, ebx	; 
+	adc edx, 0		; edx:ebx stores number of sectors to data area
+	push edx
+	push eax
+
+
+	; Get num of sector to root dir
 	
-	; mov ebx, [stpf]
-	; mov cx, bx
-	; shr ebx, 16 	; bx:cx store sectors per fat
-	xor eax, eax
-	mov ax, [rsts]
-	mov ebx, [stpf]
-	add ebx, eax	; ebx stores num.of sectors to data
+	mov eax, [csrd]	; cluster of start root dir
+	sub eax, 2
+	xor ebx, ebx
+	mov bl, [stpc]	; sectors per cluster
+	mul ebx			; edx:eax stores number of sector to root dir
 
-	xor eax, eax
-	mov eax, [root_clus]
-	; mul byte ptr [stpc] 
-
+	pop ebx
+	pop ecx
 	add eax, ebx
+	adc edx, ecx	; edx:eax stores total number of sectors to root dir (from begining
+					; of partition, NOT begining of disk)
+
+	mov bx, [bpst]	; bytes per sector
+	mul ebx			; edx:eax stores LBA to root dir (from begining of partition,
+					; NOT from begining of disk)
+
+	; push eax
+	; mov ecx, edx
+	; call printbn
+	; pop ecx
+	; call printbn
+
+
+	mov si, drive
+	call prints
+
+	xor ecx, ecx
+	pop cx
+	xor ch, ch
+	call printbn
+
+	; push eax
+	; mov si, lba
+	; call prints
+
+	; pop ecx
+	; call printbn
 
 	; Print somethings
 
-	mov si, str
-	call prints
+	; mov si, str
+	; call prints
 
-	mov ecx, 1234567890 ; over_bpb - $$
-	call printbn
+	; mov ecx, over_bpb - $$
+	; call printbn
 
 	jmp $
 
@@ -129,7 +168,11 @@ printbn:
 	.return:
 	ret
 
-str: db 'Sizeof bpb is: ', 0
+str: 	db '. Sizeof bpb is: ', 0
+data: 	db 'Num of sectors to data: ', 0
+root: 	db 'Number of sectors to root dir: ', 0
+lba: 	db 'LBA to root dir: ', 0
+drive:	db 'Drive number: ', 0
 
 	times 510 - ($-$$) db 0
 	db 0x55

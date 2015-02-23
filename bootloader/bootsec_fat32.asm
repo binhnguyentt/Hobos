@@ -83,8 +83,12 @@ start:
 	; Note: edx:eax stores LBA to root dir
 	; LBA's unit is sector (not byte)
 
+	mov [rootdr], eax	; Store LBA to root directory
+
 	; Read sectors
-	pop cx			; Drive number
+	pop cx				; Drive number
+	mov [driven], cl
+
 	xor bh, bh
 	mov bl, [stpc]	; Read 1 Cluster
 	call read_disk	; Read
@@ -141,11 +145,40 @@ start:
 			; Now ds:si store cluster of kernel.bin
 			; TODO: need combine with cluster high
 
+			xor edx, edx
 			xor ecx, ecx
-			mov cx, [si]
-			call printbn
+			xor eax, eax
 
-			jmp $
+			mov ax, [si]
+			sub ax, 2		; Cluster begin from 2
+			mov cl, [stpc]
+			mul ecx			; edx:eax store LBA to kernel.bin (from LBA root dir)
+
+			mov ecx, [rootdr]	; Final lba = file lba + root dir lba
+			add eax, ecx
+			adc edx, 0
+
+			mov ebx, 0x9000
+			mov [addr], ebx	; Offset
+
+			xor bh, bh
+			mov bl, [stpc]
+
+			mov cl, [driven]
+
+			call read_disk
+
+			cmp ah, 0
+			je .okay
+
+			; Error
+			mov si, errmsg
+			call prints
+			jmp halt
+			
+			.okay:
+			; Kernel is loaded (Yay)
+			jmp 0x9000
 
 			.next_entry:
 			pop si
@@ -214,8 +247,17 @@ printbn:
 	.return:
 	ret
 
+rootdr: dq 0						; Root directory begin
+driven: db 0						; Drive number
+
 errmsg:	db 'Cant read sector', 0
 kernel: db 'KERNEL  BIN'
+
+
+halt:
+	cli
+	hlt
+	jmp $
 
 ; Read disk with:
 ; LBA: stores in edx:eax

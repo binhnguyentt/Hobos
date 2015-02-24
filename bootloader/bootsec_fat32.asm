@@ -38,8 +38,9 @@ over_bpb:
 start:
 	cli
 	xor ax, ax
-	mov ss, ax
 	mov ds, ax
+	mov es, ax
+	mov ss, ax
 	mov sp, 0x7c00
 	sti
 
@@ -86,11 +87,19 @@ start:
 	mov [rootdr], eax	; Store LBA to root directory
 
 	; Read sectors
-	pop cx				; Drive number
-	mov [driven], cl
+	mov [ROOTDIR_OFFSET], eax
+	mov [ROOTDIR_OFFSET + 4], edx
+	mov si, ROOTDIR_OFFSET		; LBA
 
-	xor bh, bh
-	mov bl, [stpc]	; Read 1 Cluster
+	pop dx				; Drive number
+	mov [driven], dl
+
+	mov ax, ROOTDIR_OFFSET	; Offset
+	mov di, ax
+
+	xor ch, ch
+	mov cl, [stpc]	; Read 1 Cluster
+
 	call read_disk	; Read
 
 	cmp ah, 1 ; Is error?
@@ -99,28 +108,28 @@ start:
 	jmp .parse_rootdir
 
 	.error:
-		mov si, errmsg
-		call prints
-		jmp .over_err
+		mov al, ERR_CANT_LOAD_ROOTDIR
+		call printc
+		jmp halt
 
 	.parse_rootdir:
 		; At this time, first dir cluster is loaded to 0x0:0x8000
-		mov si, 0x8000
+		mov si, ROOTDIR_OFFSET
 		
 		.loop:
 			; End of list?
 			; TODO: I still not check for end-of-cluster yet
 			; so, if directory length over 1 cluster, this will cause error
-			cmp byte [si], 0
+			cmp byte [es:si], 0
 			je .go_out
 
 			; Is that a deleted entry?
-			cmp byte [si], 0x5e
+			cmp byte [es:si], 0x5e
 			je .go_out
 
 			push si
 			mov di, si
-			add di, 11
+			add di, 11			; Seek to attribute
 
 			; Check for valid entry?
 			cmp byte [di], 0xF	; Fat32 LFN
@@ -131,18 +140,15 @@ start:
 			; Here, si point to 8.3 name of entry
 			mov dx, si
 			mov di, stage2
-			mov cx, 11
+			mov cx, 11			; In 8.3 format, we need 8 + 3 = 11 characters
 			repe cmpsb
 			jne .next_entry
 
 			; Got file stage2 (8.3 format)
-			mov si, dx
-			;xor bl, bl
-			;mov byte [di], bl
-			;call prints
+			mov si, dx	; si still point to directory entry
 
-			add si, 26	; cluster low
-			; Now ds:si store cluster of stage2
+			add si, 26	; seek to cluster low
+			; Now es:si store cluster of stage2
 			; TODO: need combine with cluster high
 
 			xor edx, edx
@@ -154,17 +160,20 @@ start:
 			mov cl, [stpc]
 			mul ecx			; edx:eax store LBA to kernel.bin (from LBA root dir)
 
-			mov ecx, [rootdr]	; Final lba = file lba + root dir lba
+			mov ecx, [rootdr]	; Final LBA = file LBA + root dir LBA
 			add eax, ecx
-			adc edx, 0
+			adc edx, 0			; edx:eax store LBA
 
-			mov ebx, STAGE2_OFFSET
-			mov [addr], ebx	; Offset
+			mov [STAGE2_OFFSET], eax		; LBA
+			mov [STAGE2_OFFSET + 4], edx
+			mov si, STAGE2_OFFSET
 
-			xor bh, bh
-			mov bl, [stpc]
+			mov di, STAGE2_OFFSET			; Offset
 
-			mov cl, [driven]
+			xor ch, ch
+			mov cl, [stpc]					; Count
+
+			mov dl, [driven]				; Drive num
 
 			call read_disk
 
@@ -172,37 +181,25 @@ start:
 			je .okay
 
 			; Error
-			mov si, errmsg
-			call prints
+			mov al, ERR_CANT_LOAD_STAGE2
+			call printc
 			jmp halt
 			
 			.okay:
-			; Kernel is loaded (Yay)
+			; Stage2 is loaded (Yay)
+			; TODO: si till on stack but does it need to care?
 			jmp STAGE2_OFFSET
 
 			.next_entry:
 			pop si
-			add si, 32
+			add si, 0x20	; Directory entry takes 32 bytes length
 			jmp .loop
 
 		.go_out:
-		jmp $
+		mov al, ERR_STAGE2_NOT_FOUND
+		call printc
+		jmp halt
 
-		; jmp 0x8000
-	.over_err:
-	
-	jmp $
-
-prints: ; ds:si point to null-terminate string
-	; cld
-	lodsb
-	cmp al, 0
-	je .return
-	call printc
-	jmp prints
-
-	.return:
-	ret
 
 ; Print a character in al to screen
 printc:
@@ -211,97 +208,27 @@ printc:
 	int 0x10
 	ret
 
-; Print a small number (< 10) stored in al
-printn:
-	add al, '0'
-	call printc
-	ret
-
-; Print a big number stored in ecx
-; Destroy eax, edx registers
-printbn:
-	cmp ecx, 10
-	jge .do_math
-
-	mov al, cl
-	call printn
-	jmp .return
-
-	.do_math:
-		mov eax, ecx
-		xor edx, edx ; edx:eax storex 32bit number
-
-		mov ecx, 10
-		div ecx 		 ; edx: remainder, eax: quotient
-		
-		push edx
-
-		; Print the rest
-		mov ecx, eax
-		call printbn
-
-		; Print the remainder
-		pop eax
-		call printn
-		
-	.return:
-	ret
-
-STAGE2_OFFSET	equ 0x500
-
-rootdr: dq 0						; Root directory begin
-driven: db 0						; Drive number
-
-errmsg:	db 'Cant read sector', 0
-stage2: db 'STAGE2     '
-
-
+; Stop the processor
 halt:
 	cli
 	hlt
 	jmp $
 
-; Read disk with:
-; LBA: stores in edx:eax
-; Drive number: stores in cl
-; Number of sectors to read: stores in bx
+%include 'disk_svc.asm'
 
-; Return:
-; ah = 0 ~> ok
-; ah = 1 ~> err
-read_disk:
-	mov [lba_addr], eax		; LBA-low
-	mov [lba_addr + 4], edx	; LBA-high
-	mov [num_sector], bx
+; Some constants
+STAGE2_OFFSET				equ 0x500
+ROOTDIR_OFFSET				equ 0x8000
 
-	mov si, packet
-	mov ah, 0x42
-	mov dl, cl
-	int 0x13
-	
-	jc .carry
-	xor ah, ah
-	jmp short .return
+; Error codes
+ERR_CANT_LOAD_ROOTDIR		equ '1'
+ERR_CANT_LOAD_STAGE2		equ	'2'
+ERR_STAGE2_NOT_FOUND		equ '3'
 
-	.carry:	; error
-	mov ah, 1
+rootdr: dq 0						; Root directory begin
+driven: db 0						; Drive number
 
-	.return:
-	ret
-	
-packet:
-	db 16		; Sizeof packet
-	db 0		; Zero
-num_sector:
-	dw 1		; Number of sectors to read (max 127 on some bioses)
-				; int 13h reset this to actual readed sectors
-addr:
-	dw 0x8000	; Offset
-	dw 0x0		; Segment
-lba_addr:
-	dd 1
-	dd 0
+stage2: db 'STAGE2     '
 
-	times 510 - ($-$$) db 0
-	db 0x55
-	db 0xaa
+times 510 - ($-$$) db 0
+dw 0xAA55

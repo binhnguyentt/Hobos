@@ -130,19 +130,19 @@ start:
 
 			; Here, si point to 8.3 name of entry
 			mov dx, si
-			mov di, kernel
+			mov di, stage2
 			mov cx, 11
 			repe cmpsb
 			jne .next_entry
 
-			; Got file Kernel.bin (8.3 format)
+			; Got file stage2 (8.3 format)
 			mov si, dx
 			;xor bl, bl
 			;mov byte [di], bl
 			;call prints
 
 			add si, 26	; cluster low
-			; Now ds:si store cluster of kernel.bin
+			; Now ds:si store cluster of stage2
 			; TODO: need combine with cluster high
 
 			xor edx, edx
@@ -253,7 +253,7 @@ rootdr: dq 0						; Root directory begin
 driven: db 0						; Drive number
 
 errmsg:	db 'Cant read sector', 0
-kernel: db 'STAGE2     '
+stage2: db 'STAGE2     '
 
 
 halt:

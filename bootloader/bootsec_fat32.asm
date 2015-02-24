@@ -158,7 +158,7 @@ start:
 			add eax, ecx
 			adc edx, 0
 
-			mov ebx, 0x9000
+			mov ebx, STAGE2_OFFSET
 			mov [addr], ebx	; Offset
 
 			xor bh, bh
@@ -178,7 +178,7 @@ start:
 			
 			.okay:
 			; Kernel is loaded (Yay)
-			jmp 0x9000
+			jmp STAGE2_OFFSET
 
 			.next_entry:
 			pop si
@@ -247,11 +247,13 @@ printbn:
 	.return:
 	ret
 
+STAGE2_OFFSET	equ 0x500
+
 rootdr: dq 0						; Root directory begin
 driven: db 0						; Drive number
 
 errmsg:	db 'Cant read sector', 0
-kernel: db 'KERNEL  BIN'
+kernel: db 'STAGE2     '
 
 
 halt:
@@ -303,11 +305,3 @@ lba_addr:
 	times 510 - ($-$$) db 0
 	db 0x55
 	db 0xaa
-
-; Next sector for test only
-cli
-hlt
-
-dd 1234567890
-
-times 2048 - ($-$$) db 0

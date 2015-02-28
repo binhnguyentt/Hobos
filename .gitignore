@@ -2,3 +2,4 @@ fat32/fat32.img
 fat32/.idea
 .gitignore~
 *.swp
+.DS_Store

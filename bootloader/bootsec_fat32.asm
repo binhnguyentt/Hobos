@@ -91,7 +91,7 @@ start:
 	; Note: edx:eax stores LBA to root dir
 	; LBA's unit is sector (not byte)
 
-	mov [rootdr], eax	; Store LBA to root directory
+	mov [ROOT_DIR_LBA], eax	; Store root directory's LBA for later usage
 
 	; Read sectors
 	mov [ROOTDIR_OFFSET], eax
@@ -167,9 +167,9 @@ start:
 			mov cl, [stpc]
 			mul ecx			; edx:eax store LBA to kernel.bin (from LBA root dir)
 
-			mov ecx, [rootdr]	; Final LBA = file LBA + root dir LBA
+			mov ecx, [ROOT_DIR_LBA]			; Final LBA = file LBA + root dir LBA
 			add eax, ecx
-			adc edx, 0			; edx:eax store LBA
+			adc edx, 0						; edx:eax store LBA
 
 			mov [STAGE2_OFFSET], eax		; LBA
 			mov [STAGE2_OFFSET + 4], edx
@@ -219,20 +219,17 @@ printc:
 halt:
 	cli
 	hlt
-	jmp $
+	jmp halt
 
 %include 'disk_svc.asm'
-
-; Some constants
-STAGE2_OFFSET				equ 0x500
-ROOTDIR_OFFSET				equ 0x8000
+%include 'memory.asm'
 
 ; Error codes
 ERR_CANT_LOAD_ROOTDIR		equ '1'
 ERR_CANT_LOAD_STAGE2		equ	'2'
 ERR_STAGE2_NOT_FOUND		equ '3'
 
-rootdr: dq 0						; Root directory begin
+; rootdr: dq 0						; Root directory begin
 driven: db 0						; Drive number
 
 stage2: db 'STAGE2     '

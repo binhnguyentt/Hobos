@@ -1,4 +1,11 @@
+; Part of Hobby Operating System
+; Fat32 bootloader
+; Copyright 2015 Binh Nguyen
+
+
+
 [org 0x7c00]
+[bits 16]
 
 jmp over_bpb
 nop

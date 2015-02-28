@@ -87,6 +87,7 @@ start:
 	
 	; Here: edx:eax stores total number of sectors to root dir (from begining
 	; of partition, NOT begining of disk)
+	; TODO Calculate LBA fron beginning of disk to work fine on multi-partitions hard disk
 
 	; Note: edx:eax stores LBA to root dir
 	; LBA's unit is sector (not byte)
@@ -94,30 +95,30 @@ start:
 	mov [ROOT_DIR_LBA], eax	; Store root directory's LBA for later usage
 
 	; Read sectors
-	mov [ROOTDIR_OFFSET], eax
+	mov [ROOTDIR_OFFSET], eax	; Temporary stores LBA here
 	mov [ROOTDIR_OFFSET + 4], edx
-	mov si, ROOTDIR_OFFSET		; LBA
+	mov si, ROOTDIR_OFFSET
 
-	pop dx				; Drive number
-	mov [driven], dl
+	pop dx						; Drive number
+	mov [DRIVE_NUMBER], dl		; Store drive number for later use
 
-	mov ax, ROOTDIR_OFFSET	; Offset
+	mov ax, ROOTDIR_OFFSET		; Offset
 	mov di, ax
 
 	xor ch, ch
-	mov cl, [stpc]	; Read 1 Cluster
+	mov cl, [stpc]				; Read 1 cluster
 
-	call read_disk	; Read
+	call read_disk				; Read it
 
-	cmp ah, 1 ; Is error?
-	je short .error
+	cmp ah, 0 					; Are we success?
+	je short .parse_rootdir
 
-	jmp .parse_rootdir
+	; jmp .parse_rootdir
 
-	.error:
-		mov al, ERR_CANT_LOAD_ROOTDIR
-		call printc
-		jmp halt
+	; .error:
+	mov al, ERR_CANT_LOAD_ROOTDIR
+	call printc
+	jmp halt
 
 	.parse_rootdir:
 		; At this time, first dir cluster is loaded to 0x0:0x8000
@@ -163,24 +164,24 @@ start:
 			xor eax, eax
 
 			mov ax, [si]
-			sub ax, 2		; Cluster begin from 2
+			sub ax, 2						; Cluster begin from 2
 			mov cl, [stpc]
-			mul ecx			; edx:eax store LBA to kernel.bin (from LBA root dir)
+			mul ecx							; edx:eax store LBA to kernel.bin (from LBA root dir)
 
 			mov ecx, [ROOT_DIR_LBA]			; Final LBA = file LBA + root dir LBA
 			add eax, ecx
 			adc edx, 0						; edx:eax store LBA
 
-			mov [STAGE2_OFFSET], eax		; LBA
+			mov [STAGE2_OFFSET], eax		; Temporate store LBA address here
 			mov [STAGE2_OFFSET + 4], edx
 			mov si, STAGE2_OFFSET
 
-			mov di, STAGE2_OFFSET			; Offset
+			mov di, STAGE2_OFFSET			; Load to this address
 
 			xor ch, ch
-			mov cl, [stpc]					; Count
+			mov cl, [stpc]					; Load one cluster
 
-			mov dl, [driven]				; Drive num
+			mov dl, [DRIVE_NUMBER]			; Drive numer we have stored
 
 			call read_disk
 
@@ -230,7 +231,7 @@ ERR_CANT_LOAD_STAGE2		equ	'2'
 ERR_STAGE2_NOT_FOUND		equ '3'
 
 ; rootdr: dq 0						; Root directory begin
-driven: db 0						; Drive number
+; driven: db 0						; Drive number
 
 stage2: db 'STAGE2     '
 

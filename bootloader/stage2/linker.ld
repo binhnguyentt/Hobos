@@ -2,8 +2,8 @@ ENTRY(main);
 /* OUTPUT_ARCH(i386) */
 SECTIONS
 {
-    . = 0x500;
-    .text : AT(0x500)
+    . = 0x600;
+    .text : AT(0x600)
     {
         _text = .;
         *(.text);
@@ -21,10 +21,16 @@ SECTIONS
         _data_end = .;
     }
     
-    /* .sig : AT(0x7DFE)
+    /* 
+    	Since this is a stage2, we don't need this anymore
+    */
+    
+    /*
+    .sig : AT(0x7DFE)
     {
         SHORT(0xaa55);
-    } */
+    } 
+    */
     
     /DISCARD/ :
     {

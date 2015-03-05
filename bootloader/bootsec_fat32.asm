@@ -233,7 +233,7 @@ ERR_STAGE2_NOT_FOUND		equ '3'
 ; rootdr: dq 0						; Root directory begin
 ; driven: db 0						; Drive number
 
-stage2: db 'STAGE2     '
+stage2: db 'STAGE2     '			; Stage2 file name in 8.3 format
 
 times 510 - ($-$$) db 0
 dw 0xAA55

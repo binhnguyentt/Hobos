@@ -5,6 +5,12 @@ extern main	        ;kmain is defined in the c file
 
 [bits 16]
 start:
+	cld
+	mov ax, 0
+	mov ds, ax
+	mov si, msg_a20
+	call prints
+
 	; Check for A20 line
 	cli
 	xor ax, ax
@@ -16,16 +22,21 @@ start:
 	mov di, 500h
 	mov si, 510h
 
-	mov byte [ds:di], 0xAB
-	mov byte [es:si], 0xAC
+	mov byte [ds:di], 0xAB	; 0x0000:500h
+	mov byte [es:si], 0xAC	; 0xFFFF:510h
 
-	cmp byte [ds:si], 0xAC 
+	cmp byte [ds:di], 0xAC 
 	jne .a20_enabled
 
-	; Enable A20 Here
+	; A20 was  disabled, enable A20 Here
+	mov al, 'A'
+	mov ah, 0Eh
+	xor bx, bx
+	int 10h
 
 	.a20_enabled:
-	
+	; A20 was enabled
+
 	lgdt [gdtr]
 	mov ax, 10h	; Data selector
 	mov ds, ax
@@ -38,7 +49,20 @@ start:
 	or eax, 1
 	mov cr0, eax
 	jmp 08h:start32
-  	;jmp 0:main
+
+; 16bit helpers
+
+prints:
+	; ds:si point to message
+	lodsb
+	cmp al, 0
+	je .return
+	mov ah, 0Eh
+	xor bx, bx
+	int 10h
+	jmp prints
+	.return:
+	ret
 
 [bits 32]
 start32:
@@ -48,8 +72,10 @@ start32:
 	;mov eax, 0xb8000
 	;mov byte [eax], 'A'
 	;mov byte [eax + 1], 
-	mov dword [0xb8000], 0x07690748
+	mov dword [0xb8000], 0x07690748 ; Output Hi message
 	jmp $
+
+msg_a20: db 'Checking for A20 line ...\r\n', 0
 
 gdt:
 	; Null selector

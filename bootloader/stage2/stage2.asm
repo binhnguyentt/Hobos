@@ -12,12 +12,14 @@ start:
 	call prints
 
 	; Check for A20 line
+	; NOTE: Mostly A20 was enabled already
+	; TODO: I haven't write any code for enable A20 (if it was disabled yet)
 	cli
 	xor ax, ax
-	mov ds, ax
+	mov ds, ax		; ds = 0x0000
 
 	not ax
-	mov es, ax
+	mov es, ax		; es = 0xFFFF
 
 	mov di, 500h
 	mov si, 510h
@@ -26,16 +28,21 @@ start:
 	mov byte [es:si], 0xAC	; 0xFFFF:510h
 
 	cmp byte [ds:di], 0xAC 
-	jne .a20_enabled
+	jne .a20_was_enabled
 
-	; A20 was  disabled, enable A20 Here
-	mov al, 'A'
-	mov ah, 0Eh
-	xor bx, bx
-	int 10h
+	; A20 was disabled, we need to enable here
+	mov si, msg_disabled
+	call prints
+	jmp .enter_protected_mode
 
-	.a20_enabled:
+	.a20_was_enabled:
 	; A20 was enabled
+	mov si, msg_enabled
+	call prints
+
+	.enter_protected_mode:
+	mov si, msg_protected_mode
+	call prints
 
 	lgdt [gdtr]
 	mov ax, 10h	; Data selector
@@ -75,7 +82,11 @@ start32:
 	mov dword [0xb8000], 0x07690748 ; Output Hi message
 	jmp $
 
-msg_a20: db 'Checking for A20 line ...\r\n', 0
+msg_a20: 			db 'Checking for A20 line ...', 0
+msg_disabled:		db 'Disabled', 13, 10, 0
+msg_enabled:		db 'Enabled', 13, 10, 0
+msg_ok				db 'Ok', 13, 10, 0
+msg_protected_mode:	db 'Entering protected mode...', 0
 
 gdt:
 	; Null selector
